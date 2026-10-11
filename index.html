@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Network</title>
+    <!-- Tải Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Tải FontAwesome cho các icon tối giản -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Tông màu tối giản: Xám nhạt, Đen, Trắng */
+        :root {
+            --bg-color: #f7f7f7;
+            --card-bg: #ffffff;
+            --text-main: #222222;
+            --text-sub: #666666;
+            --border-color: #e0e0e0;
+            --btn-bg: #333333;
+            --btn-hover: #111111;
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #eeeeee;
+            --text-sub: #aaaaaa;
+            --border-color: #333333;
+            --btn-bg: #eeeeee;
+            --btn-hover: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .hidden { display: none !important; }
+        
+        /* Containers */
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        
+        /* Inputs & Buttons */
+        input, textarea, .rich-editor { 
+            width: 100%; padding: 12px; margin-bottom: 12px; 
+            border: 1px solid var(--border-color); border-radius: 6px; 
+            background: var(--bg-color); color: var(--text-main); box-sizing: border-box;
+        }
+        button { 
+            background-color: var(--btn-bg); color: var(--bg-color); 
+            border: none; padding: 10px 16px; border-radius: 6px; 
+            cursor: pointer; font-weight: 600; font-size: 14px;
+        }
+        body.dark-mode button { color: #121212; }
+        button:hover { background-color: var(--btn-hover); }
+        .btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+        .text-btn { background: none; color: var(--text-sub); text-decoration: underline; padding: 0; margin-top: 10px; }
+        
+        /* Navigation (Trang chủ) */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--card-bg); border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 100; }
+        .profile-icon { width: 40px; height: 40px; border-radius: 50%; background: #ccc; cursor: pointer; object-fit: cover; }
+        
+        /* Fullscreen Modals */
+        .fullscreen-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color); z-index: 1000; overflow-y: auto; padding: 20px;
+            box-sizing: border-box;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
+        
+        /* Rich Text Editor */
+        .editor-toolbar button { padding: 5px 10px; margin-right: 5px; background: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); }
+        .rich-editor { min-height: 150px; outline: none; }
+        .rich-editor[contenteditable]:empty::before { content: "Bạn đang nghĩ gì?"; color: var(--text-sub); }
+
+        /* Profile Layout */
+        .profile-header { text-align: center; margin-bottom: 20px; }
+        .profile-avatar-large { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; }
+        .social-icons i { font-size: 24px; margin: 0 10px; color: var(--text-main); cursor: pointer; }
+
+        /* Posts */
+        .post-header { display: flex; align-items: center; margin-bottom: 10px; }
+        .post-header img { width: 32px; height: 32px; border-radius: 50%; margin-right: 10px; }
+        .post-actions { display: flex; gap: 15px; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+        .post-actions i { cursor: pointer; color: var(--text-sub); }
+    </style>
+</head>
+<body>
+
+    <!-- KHU VỰC XÁC THỰC (AUTH) -->
+    <div id="auth-section" class="container">
+        <!-- Form Đăng nhập -->
+        <div id="login-box" class="card">
+            <h2>Đăng nhập</h2>
+            <input type="email" id="login-email" placeholder="Email">
+            <input type="password" id="login-password" placeholder="Mật khẩu">
+            <button onclick="login()">Đăng nhập</button>
+            <br>
+            <button class="text-btn" onclick="toggleAuthMode('register')">Bạn chưa có tài khoản? Đăng ký</button>
+        </div>
+
+        <!-- Form Đăng ký -->
+        <div id="register-box" class="card hidden">
+            <h2>Đăng ký</h2>
+            <input type="text" id="reg-name" placeholder="Tên hiển thị">
+            <input type="email" id="reg-email" placeholder="Email">
+            <button class="btn-outline" onclick="sendOtp()" style="margin-bottom:12px; width:100%;">Gửi mã xác minh</button>
+            
+            <input type="text" id="reg-otp" placeholder="Nhập mã xác minh 6 số từ email">
+            <input type="password" id="reg-password" placeholder="Đặt mật khẩu">
+            <input type="password" id="reg-password-confirm" placeholder="Xác nhận mật khẩu">
+            <button onclick="verifyOtpAndRegister()">Đăng ký</button>
+            <br>
+            <button class="text-btn" onclick="toggleAuthMode('login')">Bạn đã có tài khoản? Đăng nhập</button>
+        </div>
+    </div>
+
+    <!-- KHU VỰC TRANG CHỦ (HOME) -->
+    <div id="home-section" class="hidden">
+        <header>
+            <img src="https://via.placeholder.com/40" id="nav-avatar" class="profile-icon" onclick="openProfile()">
+            <h3>Trang chủ</h3>
+            <button onclick="openCreatePost()"><i class="fas fa-plus"></i> Tạo bài</button>
+        </header>
+        <div class="container" id="feed-container">
+            <!-- Bài viết sẽ được render ở đây bằng JS -->
+        </div>
+    </div>
+
+    <!-- MODAL TRANG CÁ NHÂN (PROFILE) -->
+    <div id="profile-modal" class="fullscreen-modal hidden">
+        <div class="modal-header">
+            <h3>Trang cá nhân</h3>
+            <button class="btn-outline" onclick="closeProfile()">Đóng</button>
+        </div>
+        <div class="container">
+            <div class="profile-header">
+                <img src="https://via.placeholder.com/120" id="profile-avatar" class="profile-avatar-large">
+                <br>
+                <button class="btn-outline" style="margin-bottom: 15px;" onclick="document.getElementById('avatar-upload').click()">Tải ảnh lên</button>
+                <input type="file" id="avatar-upload" class="hidden" accept="image/*">
+                
+                <h2 id="profile-name">Tên hiển thị</h2>
+                <p id="profile-bio" class="text-sub">Chưa có tiểu sử...</p>
+                <div class="social-icons">
+                    <i class="fab fa-facebook"></i>
+                    <i class="fab fa-instagram"></i>
+                    <i class="fab fa-github"></i>
+                </div>
+            </div>
+            
+            <hr style="border-top: 1px solid var(--border-color); margin: 20px 0;">
+            <div style="display: flex; justify-content: space-between;">
+                <button class="btn-outline" onclick="toggleTheme()"><i class="fas fa-moon"></i> Giao diện</button>
+                <button onclick="logout()">Đăng xuất</button>
+            </div>
+            
+            <h3 style="margin-top: 30px;">Bài viết của tôi</h3>
+            <div id="my-posts-container"></div>
+        </div>
+    </div>
+
+    <!-- MODAL TẠO BÀI VIẾT -->
+    <div id="create-post-modal" class="fullscreen-modal hidden">
+        <div class="modal-header">
+            <h3>Tạo bài viết</h3>
+            <button class="btn-outline" onclick="closeCreatePost()">Hủy</button>
+        </div>
+        <div class="container">
+            <div class="editor-toolbar">
+                <button onclick="formatText('bold')"><b>B</b></button>
+                <button onclick="formatText('italic')"><i>I</i></button>
+                <button onclick="formatText('underline')"><u>U</u></button>
+            </div>
+            <div id="post-editor" class="rich-editor" contenteditable="true"></div>
+            
+            <input type="file" id="post-image-upload" accept="image/*" style="margin-top: 15px;">
+            <label style="display:flex; align-items:center; gap:10px; margin-bottom: 20px;">
+                <input type="checkbox" id="allow-comments" checked> Cho phép bình luận
+            </label>
+            
+            <button style="width: 100%;" onclick="publishPost()">Đăng bài</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
